@@ -152,6 +152,38 @@ class BufferPoolManager {
    */
   void FlushAllPagesImpl();
 
+  // =========================辅助函数===========================
+  bool IsALLPagesPinned() {
+    // 满足条件是当前buffer pool没有空余空间 并且 也没有可换出的frame
+    return this->free_list_.empty() && this->replacer_->Size() == 0;
+  }
+
+  void InitNewPage(frame_id_t frame_id, page_id_t page_id) {
+    this->pages_[frame_id].page_id_ = page_id;
+    this->pages_[frame_id].pin_count_ = 1;
+    this->pages_[frame_id].is_dirty_ = false;
+  }
+
+  frame_id_t FindReplace() {
+    frame_id_t frame_id = -1;
+    if (!this->free_list_.empty()) {
+      frame_id = free_list_.front();
+      free_list_.pop_front();
+    } else if (this->replacer_->Size() > 0) {
+      this->replacer_->Victim(&frame_id);
+      auto replace_page = &pages_[frame_id];
+      page_table_.erase(replace_page->page_id_);
+      // 如果要换出的page被修改过就写入磁盘
+      if (pages_[frame_id].IsDirty()) {
+        disk_manager_->WritePage(replace_page->page_id_, replace_page->GetData());
+      }
+    }
+
+    return frame_id;
+  }
+
+  // ===========================================================
+
   /** Number of pages in the buffer pool. */
   size_t pool_size_;
   /** Array of buffer pool pages. */

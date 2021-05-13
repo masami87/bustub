@@ -19,7 +19,16 @@ LRUReplacer::LRUReplacer(size_t num_pages) : head_(-1), tail_(-1), capacity_(num
   tail_.prev_ = &head_;
 }
 
-LRUReplacer::~LRUReplacer() = default;
+LRUReplacer::~LRUReplacer() {
+  if (this->size_ > 0) {
+    auto p = this->head_.succ_;
+    while (p != &this->tail_) {
+      auto tmp = p->succ_;
+      delete p;
+      p = tmp;
+    }
+  }
+}
 
 bool LRUReplacer::Victim(frame_id_t *frame_id) {
   std::lock_guard<std::mutex> guard{mtx_};
